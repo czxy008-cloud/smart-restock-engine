@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能补货决策支持系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; background: #f0f2f5; color: #1d2129; }
+
+        .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); position: sticky; top: 0; z-index: 100; }
+        .header-title { font-size: 22px; font-weight: 600; letter-spacing: 1px; }
+        .header-subtitle { font-size: 13px; opacity: 0.7; margin-top: 2px; }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .filter-bar { background: #fff; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .filter-bar label { font-size: 14px; color: #4e5969; font-weight: 500; }
+        .filter-bar select { padding: 8px 16px; border: 1px solid #e5e6eb; border-radius: 8px; font-size: 14px; color: #1d2129; background: #fff; min-width: 160px; cursor: pointer; transition: border-color 0.2s; }
+        .filter-bar select:hover { border-color: #165dff; }
+        .filter-bar select:focus { outline: none; border-color: #165dff; box-shadow: 0 0 0 2px rgba(22,93,255,0.1); }
+
+        .btn { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #165dff; color: #fff; }
+        .btn-primary:hover { background: #4080ff; }
+        .btn-success { background: #00b42a; color: #fff; }
+        .btn-success:hover { background: #23c343; }
+        .btn-warning { background: #ff7d00; color: #fff; }
+        .btn-warning:hover { background: #ff9a2e; }
+        .btn-danger { background: #f53f3f; color: #fff; }
+        .btn-danger:hover { background: #f76560; }
+        .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+        .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+        .stat-card.blue::before { background: #165dff; }
+        .stat-card.green::before { background: #00b42a; }
+        .stat-card.orange::before { background: #ff7d00; }
+        .stat-card.red::before { background: #f53f3f; }
+        .stat-card-label { font-size: 13px; color: #86909c; margin-bottom: 8px; }
+        .stat-card-value { font-size: 28px; font-weight: 700; }
+        .stat-card.blue .stat-card-value { color: #165dff; }
+        .stat-card.green .stat-card-value { color: #00b42a; }
+        .stat-card.orange .stat-card-value { color: #ff7d00; }
+        .stat-card.red .stat-card-value { color: #f53f3f; }
+
+        .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .chart-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .chart-title { font-size: 16px; font-weight: 600; color: #1d2129; margin-bottom: 16px; padding-left: 12px; border-left: 3px solid #165dff; }
+        .chart-container { height: 320px; }
+
+        .tabs { display: flex; gap: 0; margin-bottom: 20px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .tab { flex: 1; padding: 14px 20px; text-align: center; cursor: pointer; font-size: 15px; font-weight: 500; color: #4e5969; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: #165dff; background: #f2f3f5; }
+        .tab.active { color: #165dff; border-bottom-color: #165dff; background: #f2f3f5; }
+
+        .table-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+        .table-header { padding: 16px 24px; border-bottom: 1px solid #e5e6eb; display: flex; justify-content: space-between; align-items: center; }
+        .table-header h3 { font-size: 16px; font-weight: 600; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f7f8fa; padding: 12px 16px; text-align: left; font-size: 13px; color: #86909c; font-weight: 600; white-space: nowrap; }
+        td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid #f2f3f5; white-space: nowrap; }
+        tr:hover td { background: #f7f8fa; }
+
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+        .badge-green { background: #e8ffea; color: #00b42a; }
+        .badge-yellow { background: #fff7e8; color: #ff7d00; }
+        .badge-red { background: #ffece8; color: #f53f3f; }
+        .badge-blue { background: #e8f3ff; color: #165dff; }
+        .badge-gray { background: #f2f3f5; color: #86909c; }
+
+        .draft-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 16px; overflow: hidden; }
+        .draft-header { padding: 16px 24px; background: linear-gradient(135deg, #f2f3f5, #e8f3ff); display: flex; justify-content: space-between; align-items: center; }
+        .draft-supplier { font-size: 16px; font-weight: 600; color: #1d2129; }
+        .draft-meta { font-size: 13px; color: #86909c; margin-top: 4px; }
+        .draft-body { padding: 0; }
+
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e5e6eb; border-top-color: #165dff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state { text-align: center; padding: 48px 20px; color: #86909c; }
+        .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state-text { font-size: 14px; }
+
+        @media (max-width: 768px) {
+            .stat-cards { grid-template-columns: repeat(2, 1fr); }
+            .charts-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="header">
+        <div>
+            <div class="header-title">智能补货决策支持系统</div>
+            <div class="header-subtitle">Smart Restock Decision Support System</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:13px;opacity:0.8;">数据刷新时间: {{ currentTime }}</span>
+            <button class="btn btn-primary" @click="refreshAll" style="font-size:13px;">刷新数据</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="filter-bar">
+            <label>门店筛选:</label>
+            <select v-model="filters.storeCode" @change="onFilterChange">
+                <option value="">全部门店</option>
+                <option value="STORE001">朝阳路旗舰店</option>
+                <option value="STORE002">望京社区店</option>
+            </select>
+            <label>品类筛选:</label>
+            <select v-model="filters.categoryCode" @change="onFilterChange">
+                <option value="">全部分类</option>
+                <option value="FOOD">食品</option>
+                <option value="DRINK">饮料</option>
+                <option value="DAILY">日用</option>
+            </select>
+            <button class="btn btn-primary" @click="onFilterChange">查询</button>
+        </div>
+
+        <div class="stat-cards">
+            <div class="stat-card blue">
+                <div class="stat-card-label">商品总数</div>
+                <div class="stat-card-value">{{ stats.productCount }}</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-card-label">库存正常</div>
+                <div class="stat-card-value">{{ stats.normalCount }}</div>
+            </div>
+            <div class="stat-card orange">
+                <div class="stat-card-label">库存预警</div>
+                <div class="stat-card-value">{{ stats.warningCount }}</div>
+            </div>
+            <div class="stat-card red">
+                <div class="stat-card-label">紧急补货</div>
+                <div class="stat-card-value">{{ stats.dangerCount }}</div>
+            </div>
+        </div>
+
+        <div class="charts-row">
+            <div class="chart-card">
+                <div class="chart-title">库存周转率看板</div>
+                <div class="chart-container" id="turnoverChart"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">品类库存分布</div>
+                <div class="chart-container" id="categoryChart"></div>
+            </div>
+        </div>
+
+        <div class="charts-row">
+            <div class="chart-card">
+                <div class="chart-title">预警状态趋势</div>
+                <div class="chart-container" id="alertTrendChart"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">销售预测对比</div>
+                <div class="chart-container" id="predictionChart"></div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab" :class="{active: activeTab==='alert'}" @click="activeTab='alert'">库存预警</div>
+            <div class="tab" :class="{active: activeTab==='prediction'}" @click="activeTab='prediction'">销售预测</div>
+            <div class="tab" :class="{active: activeTab==='draft'}" @click="activeTab='draft'; loadDrafts()">采购协同</div>
+        </div>
+
+        <div v-if="activeTab==='alert'">
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>库存预警监控列表</h3>
+                    <button class="btn btn-warning btn-sm" @click="refreshAlerts">刷新预警状态</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SKU编码</th>
+                                <th>商品名称</th>
+                                <th>门店</th>
+                                <th>品类</th>
+                                <th>当前库存</th>
+                                <th>安全库存</th>
+                                <th>预警状态</th>
+                                <th>建议补货量</th>
+                                <th>周转率</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in alertList" :key="item.skuCode+item.storeCode">
+                                <td>{{ item.skuCode }}</td>
+                                <td>{{ item.productName }}</td>
+                                <td>{{ item.storeName }}</td>
+                                <td><span class="badge badge-blue">{{ item.categoryCode }}</span></td>
+                                <td :style="{color: item.currentQuantity <= item.safetyQuantity ? '#f53f3f' : '#1d2129', fontWeight: 600}">{{ item.currentQuantity }}</td>
+                                <td>{{ item.safetyQuantity }}</td>
+                                <td>
+                                    <span class="badge" :class="{'badge-green': item.alertStatus===0, 'badge-yellow': item.alertStatus===1, 'badge-red': item.alertStatus===2}">{{ item.alertLevel }}</span>
+                                </td>
+                                <td>
+                                    <span v-if="item.suggestedRestockQty > 0" style="color:#f53f3f;font-weight:600;">+{{ item.suggestedRestockQty }}</span>
+                                    <span v-else style="color:#86909c;">-</span>
+                                </td>
+                                <td>{{ item.turnoverRate }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="alertList.length===0" class="empty-state">
+                        <div class="empty-state-icon">✓</div>
+                        <div class="empty-state-text">暂无预警数据，库存状态正常</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="activeTab==='prediction'">
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>销售预测引擎 - 未来7天预测</h3>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SKU编码</th>
+                                <th>商品名称</th>
+                                <th>门店</th>
+                                <th>移动平均日均</th>
+                                <th>季节性因子</th>
+                                <th>预测日均销量</th>
+                                <th>7天预测总量</th>
+                                <th>逐日预测</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in predictionList" :key="item.skuCode+item.storeCode">
+                                <td>{{ item.skuCode }}</td>
+                                <td>{{ item.productName }}</td>
+                                <td>{{ item.storeName }}</td>
+                                <td>{{ item.avgDailySales }}</td>
+                                <td>
+                                    <span class="badge" :class="{'badge-green': item.seasonalFactor>=1, 'badge-yellow': item.seasonalFactor<1}">{{ item.seasonalFactor }}x</span>
+                                </td>
+                                <td style="font-weight:600;color:#165dff;">{{ item.predictedDailySales }}</td>
+                                <td style="font-weight:600;">{{ item.predictedDailySales * 7 }}</td>
+                                <td>
+                                    <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                                        <span v-for="d in item.dailyPredictions" :key="d.date" class="badge badge-blue" style="font-size:11px;">
+                                            {{ d.date.slice(5) }}: {{ d.predictedQuantity }}
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="activeTab==='draft'">
+            <div v-if="draftList.length===0" class="empty-state" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:48px;">
+                <div class="empty-state-icon">📦</div>
+                <div class="empty-state-text">暂无待补货商品，所有库存充足</div>
+            </div>
+            <div v-for="draft in draftList" :key="draft.supplierCode" class="draft-card">
+                <div class="draft-header">
+                    <div>
+                        <div class="draft-supplier">{{ draft.supplierName }}</div>
+                        <div class="draft-meta">供应商编码: {{ draft.supplierCode }} | 收货门店: {{ draft.storeName }}</div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-success btn-sm" @click="confirmDraft(draft)">确认下单</button>
+                    </div>
+                </div>
+                <div class="draft-body">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SKU编码</th>
+                                <th>商品名称</th>
+                                <th>品类</th>
+                                <th>采购数量</th>
+                                <th>采购单价</th>
+                                <th>采购金额</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in draft.items" :key="item.skuCode">
+                                <td>{{ item.skuCode }}</td>
+                                <td>{{ item.productName }}</td>
+                                <td><span class="badge badge-blue">{{ item.categoryCode }}</span></td>
+                                <td style="font-weight:600;">{{ item.quantity }}</td>
+                                <td>¥{{ item.purchasePrice }}</td>
+                                <td style="font-weight:600;color:#f53f3f;">¥{{ item.amount }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="loading" class="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+</div>
+
+<script>
+const BASE_URL = '/api';
+const { createApp, ref, reactive, onMounted, nextTick, watch } = Vue;
+
+createApp({
+    setup() {
+        const loading = ref(false);
+        const currentTime = ref(new Date().toLocaleString('zh-CN'));
+        const activeTab = ref('alert');
+        const filters = reactive({ storeCode: '', categoryCode: '' });
+        const alertList = ref([]);
+        const predictionList = ref([]);
+        const draftList = ref([]);
+        const stats = reactive({ productCount: 0, normalCount: 0, warningCount: 0, dangerCount: 0 });
+
+        let turnoverChart = null;
+        let categoryChart = null;
+        let alertTrendChart = null;
+        let predictionChart = null;
+
+        const api = (url) => axios.get(BASE_URL + url).then(r => r.data.data).catch(e => { console.error(e); return null; });
+
+        async function loadDashboard() {
+            const params = new URLSearchParams();
+            if (filters.storeCode) params.set('storeCode', filters.storeCode);
+            if (filters.categoryCode) params.set('categoryCode', filters.categoryCode);
+            const data = await api('/dashboard/turnover?' + params.toString());
+            if (data) {
+                renderTurnoverChart(data);
+                renderCategoryChart(data);
+                let totalProducts = 0, totalAlerts = 0;
+                data.forEach(d => { totalProducts += d.productCount; totalAlerts += d.alertCount; });
+                stats.productCount = totalProducts;
+                stats.dangerCount = totalAlerts;
+                stats.normalCount = totalProducts - totalAlerts;
+                stats.warningCount = 0;
+            }
+        }
+
+        async function loadAlerts() {
+            const params = new URLSearchParams();
+            if (filters.storeCode) params.set('storeCode', filters.storeCode);
+            if (filters.categoryCode) params.set('categoryCode', filters.categoryCode);
+            const data = await api('/alert/list?' + params.toString());
+            if (data) {
+                alertList.value = data;
+                let danger = 0, warning = 0;
+                data.forEach(d => { if (d.alertStatus === 2) danger++; else if (d.alertStatus === 1) warning++; });
+                stats.dangerCount = danger;
+                stats.warningCount = warning;
+                stats.normalCount = stats.productCount - danger - warning;
+                renderAlertTrendChart(data);
+            }
+        }
+
+        async function loadPredictions() {
+            if (!filters.storeCode) {
+                predictionList.value = [];
+                return;
+            }
+            const params = new URLSearchParams();
+            params.set('storeCode', filters.storeCode);
+            if (filters.categoryCode) params.set('categoryCode', filters.categoryCode);
+            const data = await api('/prediction/batch?' + params.toString());
+            if (data) {
+                predictionList.value = data;
+                renderPredictionChart(data);
+            }
+        }
+
+        async function loadDrafts() {
+            const storeCode = filters.storeCode || 'STORE001';
+            const data = await api('/purchase-order/drafts?storeCode=' + storeCode);
+            if (data) draftList.value = data;
+        }
+
+        async function refreshAlerts() {
+            loading.value = true;
+            await axios.post(BASE_URL + '/alert/refresh');
+            await loadAlerts();
+            loading.value = false;
+        }
+
+        async function confirmDraft(draft) {
+            if (!confirm('确认向 ' + draft.supplierName + ' 下单？')) return;
+            alert('采购订单已生成，订单编号: PO' + Date.now());
+        }
+
+        function onFilterChange() {
+            currentTime.value = new Date().toLocaleString('zh-CN');
+            loadDashboard();
+            loadAlerts();
+            loadPredictions();
+        }
+
+        function refreshAll() {
+            onFilterChange();
+        }
+
+        function renderTurnoverChart(data) {
+            if (!turnoverChart) turnoverChart = echarts.init(document.getElementById('turnoverChart'));
+            const names = data.map(d => (d.storeName || d.storeCode) + '-' + (d.categoryName || d.categoryCode));
+            turnoverChart.setOption({
+                tooltip: { trigger: 'axis' },
+                xAxis: { type: 'category', data: names, axisLabel: { rotate: 20, fontSize: 11 } },
+                yAxis: { type: 'value', name: '周转率' },
+                series: [{
+                    type: 'bar', data: data.map(d => d.turnoverRate),
+                    itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#165dff' }, { offset: 1, color: '#94bfff' }]), borderRadius: [4, 4, 0, 0] },
+                    label: { show: true, position: 'top', fontSize: 12, color: '#1d2129' }
+                }],
+                grid: { left: 60, right: 20, bottom: 60, top: 20 }
+            });
+        }
+
+        function renderCategoryChart(data) {
+            if (!categoryChart) categoryChart = echarts.init(document.getElementById('categoryChart'));
+            const categoryMap = {};
+            data.forEach(d => {
+                const key = d.categoryName || d.categoryCode;
+                if (!categoryMap[key]) categoryMap[key] = { sales: 0, inventory: 0 };
+                categoryMap[key].sales += d.totalSalesQuantity;
+                categoryMap[key].inventory += d.totalInventoryQuantity;
+            });
+            const categories = Object.keys(categoryMap);
+            categoryChart.setOption({
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['期间销量', '当前库存'], bottom: 0 },
+                xAxis: { type: 'category', data: categories },
+                yAxis: { type: 'value' },
+                series: [
+                    { name: '期间销量', type: 'bar', data: categories.map(c => categoryMap[c].sales), itemStyle: { color: '#165dff', borderRadius: [4, 4, 0, 0] } },
+                    { name: '当前库存', type: 'bar', data: categories.map(c => categoryMap[c].inventory), itemStyle: { color: '#00b42a', borderRadius: [4, 4, 0, 0] } }
+                ],
+                grid: { left: 60, right: 20, bottom: 50, top: 20 }
+            });
+        }
+
+        function renderAlertTrendChart(data) {
+            if (!alertTrendChart) alertTrendChart = echarts.init(document.getElementById('alertTrendChart'));
+            const stores = [...new Set(data.map(d => d.storeName || d.storeCode))];
+            alertTrendChart.setOption({
+                tooltip: { trigger: 'item' },
+                legend: { bottom: 0 },
+                series: [{
+                    type: 'pie', radius: ['40%', '70%'], center: ['50%', '45%'],
+                    data: [
+                        { value: data.filter(d => d.alertStatus === 0).length, name: '正常', itemStyle: { color: '#00b42a' } },
+                        { value: data.filter(d => d.alertStatus === 1).length, name: '预警', itemStyle: { color: '#ff7d00' } },
+                        { value: data.filter(d => d.alertStatus === 2).length, name: '紧急', itemStyle: { color: '#f53f3f' } }
+                    ],
+                    label: { formatter: '{b}: {c} ({d}%)' }
+                }]
+            });
+        }
+
+        function renderPredictionChart(data) {
+            if (!predictionChart) predictionChart = echarts.init(document.getElementById('predictionChart'));
+            if (data.length === 0) { predictionChart.clear(); return; }
+            const skuNames = data.map(d => d.productName);
+            predictionChart.setOption({
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['移动平均日均', '预测日均销量'], bottom: 0 },
+                xAxis: { type: 'category', data: skuNames, axisLabel: { rotate: 15, fontSize: 11 } },
+                yAxis: { type: 'value', name: '件/天' },
+                series: [
+                    { name: '移动平均日均', type: 'bar', data: data.map(d => d.avgDailySales), itemStyle: { color: '#86909c', borderRadius: [4, 4, 0, 0] } },
+                    { name: '预测日均销量', type: 'bar', data: data.map(d => d.predictedDailySales), itemStyle: { color: '#165dff', borderRadius: [4, 4, 0, 0] } }
+                ],
+                grid: { left: 60, right: 20, bottom: 60, top: 20 }
+            });
+        }
+
+        onMounted(() => {
+            loadDashboard();
+            loadAlerts();
+            window.addEventListener('resize', () => {
+                turnoverChart && turnoverChart.resize();
+                categoryChart && categoryChart.resize();
+                alertTrendChart && alertTrendChart.resize();
+                predictionChart && predictionChart.resize();
+            });
+        });
+
+        watch(activeTab, (val) => {
+            if (val === 'prediction') loadPredictions();
+        });
+
+        return { loading, currentTime, activeTab, filters, alertList, predictionList, draftList, stats, onFilterChange, refreshAll, refreshAlerts, confirmDraft, loadDrafts };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
