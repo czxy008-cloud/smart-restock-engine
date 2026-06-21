@@ -27,4 +27,9 @@ public class PurchaseOrderController {
     public CommonResult<PurchaseOrder> confirmOrder(@RequestParam String orderNo) {
         return CommonResult.success(purchaseOrderService.confirmOrder(orderNo));
     }
+
+    @PostMapping("/create-from-draft")
+    public CommonResult<PurchaseOrder> createFromDraft(@RequestBody PurchaseOrderDraftDTO draftDTO) {
+        return CommonResult.success(purchaseOrderService.createPurchaseOrderFromDraft(draftDTO));
+    }
 }

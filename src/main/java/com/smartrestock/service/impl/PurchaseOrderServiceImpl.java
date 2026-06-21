@@ -146,4 +146,46 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         return order;
     }
+
+    @Override
+    public PurchaseOrder createPurchaseOrderFromDraft(PurchaseOrderDraftDTO draftDTO) {
+        String orderNo = "PO" + System.currentTimeMillis() + (int)(Math.random() * 1000);
+
+        List<PurchaseOrderItemDraft> items = draftDTO.getItems();
+        int totalQuantity = 0;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (PurchaseOrderItemDraft item : items) {
+            totalQuantity += item.getQuantity();
+            totalAmount = totalAmount.add(item.getAmount());
+        }
+        totalAmount = totalAmount.setScale(2, RoundingMode.HALF_UP);
+
+        PurchaseOrder order = new PurchaseOrder();
+        order.setOrderNo(orderNo);
+        order.setSupplierCode(draftDTO.getSupplierCode());
+        order.setSupplierName(draftDTO.getSupplierName());
+        order.setStoreCode(draftDTO.getStoreCode());
+        order.setStoreName(draftDTO.getStoreName());
+        order.setOrderStatus(0);
+        order.setTotalAmount(totalAmount);
+        order.setTotalQuantity(totalQuantity);
+        order.setOrderDate(LocalDate.now());
+        order.setBuyer("系统自动生成");
+        purchaseOrderMapper.insert(order);
+
+        for (PurchaseOrderItemDraft itemDraft : items) {
+            com.smartrestock.entity.PurchaseOrderItem item = new com.smartrestock.entity.PurchaseOrderItem();
+            item.setOrderNo(orderNo);
+            item.setSkuCode(itemDraft.getSkuCode());
+            item.setProductName(itemDraft.getProductName());
+            item.setCategoryCode(itemDraft.getCategoryCode());
+            item.setQuantity(itemDraft.getQuantity());
+            item.setPurchasePrice(itemDraft.getPurchasePrice());
+            item.setAmount(itemDraft.getAmount());
+            item.setReceivedQuantity(0);
+            purchaseOrderItemMapper.insert(item);
+        }
+
+        return order;
+    }
 }

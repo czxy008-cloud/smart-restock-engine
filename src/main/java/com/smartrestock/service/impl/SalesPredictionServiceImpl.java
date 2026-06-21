@@ -59,9 +59,11 @@ public class SalesPredictionServiceImpl implements SalesPredictionService {
             avgDailySales = (int) Math.round((double) totalSales / salesRecords.size());
         }
 
-        BigDecimal effectiveSeasonalFactor = BigDecimal.ONE;
-        if (seasonalFactorMonth != null && seasonalFactorMonth.intValue() == LocalDate.now().getMonthValue()) {
+        BigDecimal effectiveSeasonalFactor;
+        if (seasonalFactorMonth == null || seasonalFactorMonth.intValue() == LocalDate.now().getMonthValue()) {
             effectiveSeasonalFactor = seasonalFactor;
+        } else {
+            effectiveSeasonalFactor = BigDecimal.ONE;
         }
 
         int predictedDailySales = (int) Math.round(avgDailySales * effectiveSeasonalFactor.doubleValue());

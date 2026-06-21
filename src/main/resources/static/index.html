@@ -397,7 +397,22 @@ createApp({
 
         async function confirmDraft(draft) {
             if (!confirm('确认向 ' + draft.supplierName + ' 下单？')) return;
-            alert('采购订单已生成，订单编号: PO' + Date.now());
+            loading.value = true;
+            try {
+                const resp = await axios.post(BASE_URL + '/purchase-order/create-from-draft', draft);
+                if (resp.data && resp.data.code === 200) {
+                    const orderNo = resp.data.data.orderNo;
+                    draftList.value = draftList.value.filter(d => d.supplierCode !== draft.supplierCode);
+                    alert('采购订单已成功生成！订单编号: ' + orderNo);
+                } else {
+                    alert('下单失败: ' + (resp.data ? resp.data.message : '未知错误'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('下单失败，请联系管理员');
+            } finally {
+                loading.value = false;
+            }
         }
 
         function onFilterChange() {

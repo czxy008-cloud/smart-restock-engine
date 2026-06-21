@@ -10,4 +10,6 @@ public interface PurchaseOrderService {
     List<PurchaseOrderDraftDTO> generateDrafts(String storeCode);
 
     PurchaseOrder confirmOrder(String orderNo);
+
+    PurchaseOrder createPurchaseOrderFromDraft(PurchaseOrderDraftDTO draftDTO);
 }
