@@ -1,5 +1,6 @@
 package com.smartrestock.service;
 
+import com.smartrestock.dto.PurchaseOrderDetailDTO;
 import com.smartrestock.dto.PurchaseOrderDraftDTO;
 import com.smartrestock.entity.PurchaseOrder;
 
@@ -12,4 +13,6 @@ public interface PurchaseOrderService {
     PurchaseOrder confirmOrder(String orderNo);
 
     PurchaseOrder createPurchaseOrderFromDraft(PurchaseOrderDraftDTO draftDTO);
+
+    List<PurchaseOrderDetailDTO> listOrders(String storeCode, Integer status);
 }

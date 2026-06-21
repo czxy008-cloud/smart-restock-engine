@@ -170,6 +170,7 @@
             <div class="tab" :class="{active: activeTab==='alert'}" @click="activeTab='alert'">库存预警</div>
             <div class="tab" :class="{active: activeTab==='prediction'}" @click="activeTab='prediction'">销售预测</div>
             <div class="tab" :class="{active: activeTab==='draft'}" @click="activeTab='draft'; loadDrafts()">采购协同</div>
+            <div class="tab" :class="{active: activeTab==='order'}" @click="activeTab='order'; loadOrders()">采购订单</div>
         </div>
 
         <div v-if="activeTab==='alert'">
@@ -305,6 +306,62 @@
                 </div>
             </div>
         </div>
+
+        <div v-if="activeTab==='order'">
+            <div v-if="orderList.length===0" class="empty-state" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:48px;">
+                <div class="empty-state-icon">📋</div>
+                <div class="empty-state-text">暂无采购订单记录</div>
+            </div>
+            <div v-for="order in orderList" :key="order.orderNo" class="draft-card">
+                <div class="draft-header">
+                    <div>
+                        <div class="draft-supplier">
+                            {{ order.orderNo }}
+                            <span class="badge" style="margin-left:8px;" :class="{
+                                'badge-gray': order.orderStatus===0,
+                                'badge-blue': order.orderStatus===1,
+                                'badge-yellow': order.orderStatus===2,
+                                'badge-green': order.orderStatus===3,
+                                'badge-red': order.orderStatus===4
+                            }">{{ order.orderStatusText }}</span>
+                        </div>
+                        <div class="draft-meta">供应商: {{ order.supplierName }} | 收货门店: {{ order.storeName }} | 下单日期: {{ order.orderDate }} | 采购员: {{ order.buyer }}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:18px;font-weight:700;color:#f53f3f;">¥{{ order.totalAmount }}</div>
+                        <div style="font-size:12px;color:#86909c;margin-top:4px;">共 {{ order.totalQuantity }} 件 / {{ order.items.length }} 种商品</div>
+                    </div>
+                </div>
+                <div class="draft-body">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SKU编码</th>
+                                <th>商品名称</th>
+                                <th>品类</th>
+                                <th>采购数量</th>
+                                <th>采购单价</th>
+                                <th>采购金额</th>
+                                <th>已收货</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in order.items" :key="item.id">
+                                <td>{{ item.skuCode }}</td>
+                                <td>{{ item.productName }}</td>
+                                <td><span class="badge badge-blue">{{ item.categoryCode }}</span></td>
+                                <td style="font-weight:600;">{{ item.quantity }}</td>
+                                <td>¥{{ item.purchasePrice }}</td>
+                                <td style="font-weight:600;color:#f53f3f;">¥{{ item.amount }}</td>
+                                <td>
+                                    <span class="badge" :class="item.receivedQuantity===item.quantity ? 'badge-green' : 'badge-yellow'">{{ item.receivedQuantity }}/{{ item.quantity }}</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div v-if="loading" class="loading-overlay">
@@ -325,6 +382,7 @@ createApp({
         const alertList = ref([]);
         const predictionList = ref([]);
         const draftList = ref([]);
+        const orderList = ref([]);
         const stats = reactive({ productCount: 0, normalCount: 0, warningCount: 0, dangerCount: 0 });
 
         let turnoverChart = null;
@@ -388,6 +446,12 @@ createApp({
             if (data) draftList.value = data;
         }
 
+        async function loadOrders() {
+            const storeCode = filters.storeCode || 'STORE001';
+            const data = await api('/purchase-order/list?storeCode=' + storeCode);
+            if (data) orderList.value = data;
+        }
+
         async function refreshAlerts() {
             loading.value = true;
             await axios.post(BASE_URL + '/alert/refresh');
@@ -402,8 +466,8 @@ createApp({
                 const resp = await axios.post(BASE_URL + '/purchase-order/create-from-draft', draft);
                 if (resp.data && resp.data.code === 200) {
                     const orderNo = resp.data.data.orderNo;
-                    draftList.value = draftList.value.filter(d => d.supplierCode !== draft.supplierCode);
-                    alert('采购订单已成功生成！订单编号: ' + orderNo);
+                    await Promise.all([loadDrafts(), loadOrders()]);
+                    alert('采购订单已成功生成！订单编号: ' + orderNo + '\n可在【采购订单】标签中查看详情');
                 } else {
                     alert('下单失败: ' + (resp.data ? resp.data.message : '未知错误'));
                 }
@@ -513,9 +577,10 @@ createApp({
 
         watch(activeTab, (val) => {
             if (val === 'prediction') loadPredictions();
+            if (val === 'order') loadOrders();
         });
 
-        return { loading, currentTime, activeTab, filters, alertList, predictionList, draftList, stats, onFilterChange, refreshAll, refreshAlerts, confirmDraft, loadDrafts };
+        return { loading, currentTime, activeTab, filters, alertList, predictionList, draftList, orderList, stats, onFilterChange, refreshAll, refreshAlerts, confirmDraft, loadDrafts, loadOrders };
     }
 }).mount('#app');
 </script>

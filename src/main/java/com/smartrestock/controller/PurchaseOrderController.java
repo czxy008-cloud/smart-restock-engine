@@ -1,6 +1,7 @@
 package com.smartrestock.controller;
 
 import com.smartrestock.dto.CommonResult;
+import com.smartrestock.dto.PurchaseOrderDetailDTO;
 import com.smartrestock.dto.PurchaseOrderDraftDTO;
 import com.smartrestock.entity.PurchaseOrder;
 import com.smartrestock.service.PurchaseOrderService;
@@ -31,5 +32,11 @@ public class PurchaseOrderController {
     @PostMapping("/create-from-draft")
     public CommonResult<PurchaseOrder> createFromDraft(@RequestBody PurchaseOrderDraftDTO draftDTO) {
         return CommonResult.success(purchaseOrderService.createPurchaseOrderFromDraft(draftDTO));
+    }
+
+    @GetMapping("/list")
+    public CommonResult<List<PurchaseOrderDetailDTO>> listOrders(@RequestParam String storeCode,
+                                                                 @RequestParam(required = false) Integer status) {
+        return CommonResult.success(purchaseOrderService.listOrders(storeCode, status));
     }
 }

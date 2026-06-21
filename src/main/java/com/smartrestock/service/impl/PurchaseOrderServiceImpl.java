@@ -1,11 +1,13 @@
 package com.smartrestock.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.smartrestock.dto.PurchaseOrderDetailDTO;
 import com.smartrestock.dto.PurchaseOrderDraftDTO;
 import com.smartrestock.dto.PurchaseOrderDraftDTO.PurchaseOrderItemDraft;
 import com.smartrestock.entity.InventorySummary;
 import com.smartrestock.entity.Product;
 import com.smartrestock.entity.PurchaseOrder;
+import com.smartrestock.entity.PurchaseOrderItem;
 import com.smartrestock.entity.RestockRule;
 import com.smartrestock.entity.SalesRecord;
 import com.smartrestock.mapper.InventorySummaryMapper;
@@ -22,8 +24,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class PurchaseOrderServiceImpl implements PurchaseOrderService {
@@ -51,6 +56,19 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     public List<PurchaseOrderDraftDTO> generateDrafts(String storeCode) {
+        QueryWrapper<PurchaseOrder> pendingOrderWrapper = new QueryWrapper<>();
+        pendingOrderWrapper.eq("store_code", storeCode).in("order_status", 0, 1, 2);
+        List<PurchaseOrder> pendingOrders = purchaseOrderMapper.selectList(pendingOrderWrapper);
+        Set<String> orderedSkuCodes = new HashSet<>();
+        for (PurchaseOrder po : pendingOrders) {
+            QueryWrapper<PurchaseOrderItem> itemWrapper = new QueryWrapper<>();
+            itemWrapper.eq("order_no", po.getOrderNo());
+            List<PurchaseOrderItem> items = purchaseOrderItemMapper.selectList(itemWrapper);
+            for (PurchaseOrderItem item : items) {
+                orderedSkuCodes.add(item.getSkuCode());
+            }
+        }
+
         QueryWrapper<InventorySummary> alertWrapper = new QueryWrapper<>();
         alertWrapper.eq("store_code", storeCode).gt("alert_status", 0);
         List<InventorySummary> alertItems = inventorySummaryMapper.selectList(alertWrapper);
@@ -60,6 +78,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         for (InventorySummary alert : alertItems) {
             String skuCode = alert.getSkuCode();
+            if (orderedSkuCodes.contains(skuCode)) {
+                continue;
+            }
 
             QueryWrapper<Product> productWrapper = new QueryWrapper<>();
             productWrapper.eq("sku_code", skuCode).eq("store_code", storeCode);
@@ -187,5 +208,68 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         }
 
         return order;
+    }
+
+    private String getOrderStatusText(Integer status) {
+        if (status == null) return "未知";
+        switch (status) {
+            case 0: return "草稿";
+            case 1: return "已提交";
+            case 2: return "部分到货";
+            case 3: return "已完成";
+            case 4: return "已取消";
+            default: return "未知";
+        }
+    }
+
+    @Override
+    public List<PurchaseOrderDetailDTO> listOrders(String storeCode, Integer status) {
+        QueryWrapper<PurchaseOrder> wrapper = new QueryWrapper<>();
+        wrapper.eq("store_code", storeCode);
+        if (status != null) {
+            wrapper.eq("order_status", status);
+        }
+        wrapper.orderByDesc("created_time");
+        List<PurchaseOrder> orders = purchaseOrderMapper.selectList(wrapper);
+
+        List<PurchaseOrderDetailDTO> result = new ArrayList<>();
+        for (PurchaseOrder order : orders) {
+            PurchaseOrderDetailDTO dto = new PurchaseOrderDetailDTO();
+            dto.setOrderNo(order.getOrderNo());
+            dto.setSupplierCode(order.getSupplierCode());
+            dto.setSupplierName(order.getSupplierName());
+            dto.setStoreCode(order.getStoreCode());
+            dto.setStoreName(order.getStoreName());
+            dto.setOrderStatus(order.getOrderStatus());
+            dto.setOrderStatusText(getOrderStatusText(order.getOrderStatus()));
+            dto.setTotalAmount(order.getTotalAmount());
+            dto.setTotalQuantity(order.getTotalQuantity());
+            dto.setOrderDate(order.getOrderDate());
+            dto.setExpectedDate(order.getExpectedDate());
+            dto.setBuyer(order.getBuyer());
+            dto.setRemark(order.getRemark());
+            dto.setCreatedTime(order.getCreatedTime());
+
+            QueryWrapper<PurchaseOrderItem> itemWrapper = new QueryWrapper<>();
+            itemWrapper.eq("order_no", order.getOrderNo());
+            List<PurchaseOrderItem> items = purchaseOrderItemMapper.selectList(itemWrapper);
+            List<PurchaseOrderDetailDTO.ItemDetail> itemDetails = items.stream().map(item -> {
+                PurchaseOrderDetailDTO.ItemDetail id = new PurchaseOrderDetailDTO.ItemDetail();
+                id.setId(item.getId());
+                id.setSkuCode(item.getSkuCode());
+                id.setProductName(item.getProductName());
+                id.setCategoryCode(item.getCategoryCode());
+                id.setQuantity(item.getQuantity());
+                id.setPurchasePrice(item.getPurchasePrice());
+                id.setAmount(item.getAmount());
+                id.setReceivedQuantity(item.getReceivedQuantity());
+                id.setRemark(item.getRemark());
+                return id;
+            }).collect(Collectors.toList());
+            dto.setItems(itemDetails);
+
+            result.add(dto);
+        }
+        return result;
     }
 }
